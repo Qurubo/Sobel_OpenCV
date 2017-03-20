@@ -14,8 +14,10 @@ using namespace std;
 Mat img,image;
 
 int pixelMatrix[3][3] = { 0 };
-float GY[6] = { -1,-2,-1,1,2,1 };
-float GX[6] = { 1,-1,2,-2,1,-1 };
+//float GY[6] = { -1,-2,-1,1,2,1 };
+//float GX[6] = { 1,-1,2,-2,1,-1 };
+float GY[6] = { -1,-2,-1,0,2,1 };
+float GX[6] = { 0,-1,2,-2,0,-1 };
 double GY_d[6] = { -1,-2,-1,1,2,1 };
 double GX_d[6] = { 1,-1,2,-2,1,-1 };
 
@@ -92,10 +94,10 @@ void sobel() {
 			pixelMatrix[2][1] = a[i + 1][j];
 			pixelMatrix[2][2] = a[i + 1][j + 1];
 			
-			float gy[6] = { pixelMatrix[0][0],pixelMatrix[0][1],pixelMatrix[0][2],pixelMatrix[2][0],
-				pixelMatrix[2][1],pixelMatrix[2][2] };
-			float gx[6] = { pixelMatrix[0][0],pixelMatrix[0][2],pixelMatrix[1][0],pixelMatrix[1][2],
-				pixelMatrix[2][0],pixelMatrix[2][2] };
+			float gy[6] = { (float)pixelMatrix[0][0],(float)pixelMatrix[0][1],(float)pixelMatrix[0][2],(float)pixelMatrix[2][0],
+				(float)pixelMatrix[2][1],(float)pixelMatrix[2][2] };
+			float gx[6] = { (float)pixelMatrix[0][0],(float)pixelMatrix[0][2],(float)pixelMatrix[1][0], (float)pixelMatrix[1][2],
+				(float)pixelMatrix[2][0],(float)pixelMatrix[2][2] };
 
 			Vec3b color = image.at<Vec3b>(Point(i, j));
 			//int edge = (int)add_sse(gy,gx);
@@ -103,7 +105,7 @@ void sobel() {
 			color.val[0] = edge;
 			color.val[1] = edge;
 			color.val[2] = edge;
-
+			
 			// set pixel 
 			image.at<Vec3b>(Point(i, j)) = color; 
 		}
@@ -111,32 +113,48 @@ void sobel() {
 }
 double convolution() {
 
-	int gy = (pixelMatrix[0][0] * -1) + (pixelMatrix[0][1] * -2) + (pixelMatrix[0][2] * -1) + (pixelMatrix[2][0]) + (pixelMatrix[2][1] * 2) + (pixelMatrix[2][2] * 1);
-	int gx = (pixelMatrix[0][0]) + (pixelMatrix[0][2] * -1) + (pixelMatrix[1][0] * 2) + (pixelMatrix[1][2] * -2) + (pixelMatrix[2][0]) + (pixelMatrix[2][2] * -1);
+	int gy = (pixelMatrix[0][0]=pixelMatrix[0][0] * -1) + (pixelMatrix[0][1]= pixelMatrix[0][1] * -2) + (pixelMatrix[0][2]=pixelMatrix[0][2] * -1) + (pixelMatrix[2][0]) + (pixelMatrix[2][1]=pixelMatrix[2][1] * 2) + (pixelMatrix[2][2]=pixelMatrix[2][2] * 1);
+	//cout << gy << "\n";
+	int gx = (pixelMatrix[0][0]) + (pixelMatrix[0][2] =pixelMatrix[0][2] * -1) + (pixelMatrix[1][0]=pixelMatrix[1][0] * 2) + (pixelMatrix[1][2]=pixelMatrix[1][2] * -2) + (pixelMatrix[2][0]) + (pixelMatrix[2][2]=pixelMatrix[2][2] * -1);
+	//cout << gx << "\n";
+	//cout << "\n";
+	/*for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			cout << pixelMatrix[i][j] << " ";
+		}
+		cout << "\n";
+	}*/
 	return sqrt(pow(gy, 2) + pow(gx, 2));
 }
 double add_sse(float *m_gy, float *m_gx){ //SSE
 	__m128 t0,t0_1, t1,t1_1;
-	t0 = _mm_load_ps(m_gy);
-	t0_1 = _mm_load_ps(GY);
+	t0 = _mm_load_ss(m_gy);
+	t0_1 = _mm_load_ss(GY);
 
-	t1 = _mm_load_ps(m_gx);
-	t1_1 = _mm_load_ps(GX);
+	t1 = _mm_load_ss(m_gx);
+	t1_1 = _mm_load_ss(GX);
 
-	t0 = _mm_add_ps(t0, t0_1);
-	t1 = _mm_add_ps(t1, t1_1);
+	t0 = _mm_mul_ss(t0, t0_1);
+	t1 = _mm_mul_ss(t1, t1_1);
 
-	_mm_store_ps(m_gy, t0);
-	_mm_store_ps(m_gx, t1);
+	_mm_store_ss(m_gy, t0_1);
+	_mm_store_ss(m_gx, t1_1);
 
-	int sum_gy = 0;
+	float sum_gy = 0.0;
 	for (int i = 0; i < 6; i++){
-		sum_gy = sum_gy + (int)m_gy[i];
+		//cout << m_gy[i] << " ";
+		sum_gy = sum_gy + m_gy[i];		
 	}
-	int sum_gx = 0;
-	for (int i = 0; i < 5; i++) {
-		sum_gx = sum_gx + (int)m_gx[i];
+	//cout << "\n";
+	float sum_gx = 0.0;
+	for (int i = 0; i < 6; i++) {
+		sum_gx = sum_gx + m_gx[i];
+		//cout << m_gx[i] << " ";
 	}
+	//cout << "\n";
+	//cout << sum_gy << "\n";
+	//cout << sum_gx << "\n";
+	//cout << "\n";
 	return sqrt(pow(sum_gy, 2) + pow(sum_gx, 2));
 
 }
@@ -148,20 +166,24 @@ double add_sse2(double *m_gy, double *m_gx) { //SSE2
 	t1 = _mm_load_pd(m_gx);
 	t1_1 = _mm_load_pd(GX_d);
 
-	t0 = _mm_add_pd(t0, t0_1);
-	t1 = _mm_add_pd(t1, t1_1);
+	t0 = _mm_mul_pd(t0, t0_1);
+	t1 = _mm_mul_pd(t1, t1_1);
 
 	_mm_store_pd(m_gy, t0);
 	_mm_store_pd(m_gx, t1);
 
-	int sum_gy = 0;
+	float sum_gy = 0;
 	for (int i = 0; i < 6; i++) {
-		sum_gy = sum_gy + (int)m_gy[i];
+		sum_gy = sum_gy + m_gy[i];
 	}
-	int sum_gx = 0;
-	for (int i = 0; i < 5; i++) {
-		sum_gx = sum_gx + (int)m_gx[i];
+	float sum_gx = 0;
+	for (int i = 0; i < 6; i++) {
+		sum_gx = sum_gx + m_gx[i];
 	}
 	return sqrt(pow(sum_gy, 2) + pow(sum_gx, 2));
+
+}
+double add_sse4(int *m_gy, int *m_gx) { //SSE 4.1
+
 
 }
