@@ -128,33 +128,28 @@ double convolution() {
 }
 double add_sse(float *m_gy, float *m_gx){ //SSE
 	__m128 t0,t0_1, t1,t1_1;
-	t0 = _mm_load_ss(m_gy);
-	t0_1 = _mm_load_ss(GY);
+	t0 = _mm_load_ps(m_gy);
+	t0_1 = _mm_load_ps(GY);
 
-	t1 = _mm_load_ss(m_gx);
-	t1_1 = _mm_load_ss(GX);
+	t1 = _mm_load_ps(m_gx);
+	t1_1 = _mm_load_ps(GX);
 
-	t0 = _mm_mul_ss(t0, t0_1);
-	t1 = _mm_mul_ss(t1, t1_1);
+	t0 = _mm_mul_ps(t0, t0_1);
+	t1 = _mm_mul_ps(t1, t1_1);
 
-	_mm_store_ss(m_gy, t0_1);
-	_mm_store_ss(m_gx, t1_1);
+	_mm_store_ps(m_gy, t0_1);
+	_mm_store_ps(m_gx, t1_1);
 
 	float sum_gy = 0.0;
 	for (int i = 0; i < 6; i++){
-		//cout << m_gy[i] << " ";
 		sum_gy = sum_gy + m_gy[i];		
 	}
-	//cout << "\n";
+
 	float sum_gx = 0.0;
 	for (int i = 0; i < 6; i++) {
 		sum_gx = sum_gx + m_gx[i];
-		//cout << m_gx[i] << " ";
 	}
-	//cout << "\n";
-	//cout << sum_gy << "\n";
-	//cout << sum_gx << "\n";
-	//cout << "\n";
+
 	return sqrt(pow(sum_gy, 2) + pow(sum_gx, 2));
 
 }
