@@ -8,16 +8,17 @@
 #include "opencv2/highgui/highgui.hpp"
 #include <iostream>
 #include <cmath>
+#include <time.h>
 
 using namespace cv;
 using namespace std;
 Mat img,image;
 
 int pixelMatrix[3][3] = { 0 };
-//float GY[6] = { -1,-2,-1,1,2,1 };
-//float GX[6] = { 1,-1,2,-2,1,-1 };
-float GY[6] = { -1,-2,-1,0,2,1 };
-float GX[6] = { 0,-1,2,-2,0,-1 };
+float GY[6] = { -1,-2,-1,1,2,1 };
+float GX[6] = { 1,-1,2,-2,1,-1 };
+//float GY[6] = { -1,-2,-1, 0,2, 1 };
+//float GX[6] = {  0,-1, 2,-2,0,-1 };
 double GY_d[6] = { -1,-2,-1,1,2,1 };
 double GX_d[6] = { 1,-1,2,-2,1,-1 };
 
@@ -28,11 +29,16 @@ void sobel();
 double convolution();
 double add_sse(float *m_gy, float *m_gx);
 double add_sse2(double *m_gy, double *m_gx);
+//float add(float *a, float *b);
 
 int main(){
+	long t1 = clock();	
 	open();	
 	sobel();
 	save();
+	long t2 = clock();
+	cout << t2 - t1 << endl; 
+	system("pause");
 	//show();
 }
 int open() {
@@ -100,8 +106,9 @@ void sobel() {
 				(float)pixelMatrix[2][0],(float)pixelMatrix[2][2] };
 
 			Vec3b color = image.at<Vec3b>(Point(i, j));
-			//int edge = (int)add_sse(gy,gx);
-			int edge = (int)convolution();
+			int edge = (int)add_sse(gy,gx);
+
+			//int edge = (int)convolution();
 			color.val[0] = edge;
 			color.val[1] = edge;
 			color.val[2] = edge;
@@ -127,32 +134,46 @@ double convolution() {
 	return sqrt(pow(gy, 2) + pow(gx, 2));
 }
 double add_sse(float *m_gy, float *m_gx){ //SSE
-	__m128 t0,t0_1, t1,t1_1;
-	t0 = _mm_load_ps(m_gy);
-	t0_1 = _mm_load_ps(GY);
 
-	t1 = _mm_load_ps(m_gx);
-	t1_1 = _mm_load_ps(GX);
+		__m128 y0, y1, x1, x0, gy0, gy1, gx1, gx0;
+		float Y0[4], Y1[4], X0[4], X1[4];
 
-	t0 = _mm_mul_ps(t0, t0_1);
-	t1 = _mm_mul_ps(t1, t1_1);
+		y0 = _mm_set_ps(m_gy[0], m_gy[1], m_gy[2], m_gy[3]);
+		y1 = _mm_set_ps(m_gy[4], m_gy[5], 0.0, 0.0);
 
-	_mm_store_ps(m_gy, t0_1);
-	_mm_store_ps(m_gx, t1_1);
+		x0 = _mm_set_ps(m_gx[0], m_gx[1], m_gx[2], m_gx[3]);
+		x1 = _mm_set_ps(m_gx[4], m_gx[5], 0.0, 0.0);
 
-	float sum_gy = 0.0;
-	for (int i = 0; i < 6; i++){
-		sum_gy = sum_gy + m_gy[i];		
-	}
+		gy0 = _mm_set_ps(GY[0], GY[1], GY[2], GY[3]);
+		gy1 = _mm_set_ps(GY[4], GY[5], 0.0, 0.0);
 
-	float sum_gx = 0.0;
-	for (int i = 0; i < 6; i++) {
-		sum_gx = sum_gx + m_gx[i];
-	}
+		gx0 = _mm_set_ps(GX[0], GX[1], GX[2], GX[3]);
+		gx1 = _mm_set_ps(GX[4], GX[5], 0.0, 0.0);
 
-	return sqrt(pow(sum_gy, 2) + pow(sum_gx, 2));
+		y0 = _mm_mul_ps(y0, gy0);
+		y1 = _mm_mul_ps(y1, gy1);
 
+		x0 = _mm_mul_ps(x0, gx0);
+		x1 = _mm_mul_ps(x1, gx1);
+
+		_mm_store_ps(Y0, y0);
+		_mm_store_ps(Y1, y1);
+
+		_mm_store_ps(X0, x0);
+		_mm_store_ps(X1, x1);
+
+		double sum_gy = 0, sum_gx = 0;
+		for (int i = 0; i < 4; i++) {
+			sum_gx = sum_gx + X0[i];
+			sum_gx = sum_gx + X1[i];
+			sum_gy = sum_gy + Y0[i];
+			sum_gy = sum_gy + Y1[i];
+			
+		}
+		return sqrt(pow(sum_gy, 2) + pow(sum_gx, 2));
 }
+
+	
 double add_sse2(double *m_gy, double *m_gx) { //SSE2
 	__m128d t0, t0_1, t1, t1_1;
 	t0 = _mm_load_pd(m_gy);
@@ -180,5 +201,5 @@ double add_sse2(double *m_gy, double *m_gx) { //SSE2
 }
 double add_sse4(int *m_gy, int *m_gx) { //SSE 4.1
 
-
+	return 1488;
 }
