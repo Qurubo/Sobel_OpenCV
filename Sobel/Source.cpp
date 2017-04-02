@@ -28,16 +28,16 @@ void show();
 void sobel();
 double convolution();
 double add_sse(float *m_gy, float *m_gx);
-double add_sse2(double *m_gy, double *m_gx);
+double add_avx(double *m_gy, double *m_gx);
 //float add(float *a, float *b);
 
 int main(){
-	long t1 = clock();	
+	unsigned int start_time = clock(); // начальное время
 	open();	
 	sobel();
 	save();
-	long t2 = clock();
-	cout << t2 - t1 << endl; 
+	unsigned int end_time = clock(); // конечное время
+	cout << (end_time - start_time) /1000.0 << " seconds." << endl;
 	system("pause");
 	//show();
 }
@@ -100,14 +100,19 @@ void sobel() {
 			pixelMatrix[2][1] = a[i + 1][j];
 			pixelMatrix[2][2] = a[i + 1][j + 1];
 			
-			float gy[6] = { (float)pixelMatrix[0][0],(float)pixelMatrix[0][1],(float)pixelMatrix[0][2],(float)pixelMatrix[2][0],
+			/*float gy[6] = { (float)pixelMatrix[0][0],(float)pixelMatrix[0][1],(float)pixelMatrix[0][2],(float)pixelMatrix[2][0],
 				(float)pixelMatrix[2][1],(float)pixelMatrix[2][2] };
 			float gx[6] = { (float)pixelMatrix[0][0],(float)pixelMatrix[0][2],(float)pixelMatrix[1][0], (float)pixelMatrix[1][2],
 				(float)pixelMatrix[2][0],(float)pixelMatrix[2][2] };
+			int edge = (int)add_sse(gy,gx);*/
+
+			double gy[6] = { (double)pixelMatrix[0][0],(double)pixelMatrix[0][1],(double)pixelMatrix[0][2],(double)pixelMatrix[2][0],
+				(double)pixelMatrix[2][1],(double)pixelMatrix[2][2] };
+			double gx[6] = { (double)pixelMatrix[0][0],(double)pixelMatrix[0][2],(double)pixelMatrix[1][0], (double)pixelMatrix[1][2],
+				(double)pixelMatrix[2][0],(double)pixelMatrix[2][2] };
+			int edge = (int)add_avx(gy, gx);
 
 			Vec3b color = image.at<Vec3b>(Point(i, j));
-			int edge = (int)add_sse(gy,gx);
-
 			//int edge = (int)convolution();
 			color.val[0] = edge;
 			color.val[1] = edge;
@@ -174,30 +179,44 @@ double add_sse(float *m_gy, float *m_gx){ //SSE
 }
 
 	
-double add_sse2(double *m_gy, double *m_gx) { //SSE2
-	__m128d t0, t0_1, t1, t1_1;
-	t0 = _mm_load_pd(m_gy);
-	t0_1 = _mm_load_pd(GY_d);
+double add_avx(double *m_gy, double *m_gx) { //AVX
 
-	t1 = _mm_load_pd(m_gx);
-	t1_1 = _mm_load_pd(GX_d);
+	__m256d y0, y1, x1, x0, gy0, gy1, gx1, gx0;
+	double Y0[4], Y1[4], X0[4], X1[4];
 
-	t0 = _mm_mul_pd(t0, t0_1);
-	t1 = _mm_mul_pd(t1, t1_1);
+	y0 = _mm256_setr_pd(m_gy[0], m_gy[1], m_gy[2], m_gy[3]);
+	y1 = _mm256_setr_pd(m_gy[4], m_gy[5], 0.0, 0.0);
 
-	_mm_store_pd(m_gy, t0);
-	_mm_store_pd(m_gx, t1);
+	x0 = _mm256_setr_pd(m_gx[0], m_gx[1], m_gx[2], m_gx[3]);
+	x1 = _mm256_setr_pd(m_gx[4], m_gx[5], 0.0, 0.0);
 
-	float sum_gy = 0;
-	for (int i = 0; i < 6; i++) {
-		sum_gy = sum_gy + m_gy[i];
-	}
-	float sum_gx = 0;
-	for (int i = 0; i < 6; i++) {
-		sum_gx = sum_gx + m_gx[i];
+	gy0 = _mm256_setr_pd(GY[0], GY[1], GY[2], GY[3]);
+	gy1 = _mm256_setr_pd(GY[4], GY[5], 0.0, 0.0);
+
+	gx0 = _mm256_setr_pd(GX[0], GX[1], GX[2], GX[3]);
+	gx1 = _mm256_setr_pd(GX[4], GX[5], 0.0, 0.0);
+
+	y0 = _mm256_mul_pd(y0, gy0);
+	y1 = _mm256_mul_pd(y1, gy1);
+
+	x0 = _mm256_mul_pd(x0, gx0);
+	x1 = _mm256_mul_pd(x1, gx1);
+
+	_mm256_stream_pd(Y0, y0);
+	_mm256_stream_pd(Y1, y1);
+
+	_mm256_stream_pd(X0, x0);
+	_mm256_stream_pd(X1, x1);
+
+	double sum_gy = 0, sum_gx = 0;
+	for (int i = 0; i < 4; i++) {
+		sum_gx = sum_gx + X0[i];
+		sum_gx = sum_gx + X1[i];
+		sum_gy = sum_gy + Y0[i];
+		sum_gy = sum_gy + Y1[i];
+
 	}
 	return sqrt(pow(sum_gy, 2) + pow(sum_gx, 2));
-
 }
 double add_sse4(int *m_gy, int *m_gx) { //SSE 4.1
 
