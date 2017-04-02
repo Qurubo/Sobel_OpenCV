@@ -25,19 +25,35 @@ double GX_d[6] = { 1,-1,2,-2,1,-1 };
 int open();
 int save();
 void show();
-void sobel();
+void sobel(int type);
 double convolution();
 double add_sse(float *m_gy, float *m_gx);
 double add_avx(double *m_gy, double *m_gx);
 //float add(float *a, float *b);
 
 int main(){
-	unsigned int start_time = clock(); // начальное время
+	
 	open();	
-	sobel();
-	save();
+	unsigned int start_time = clock(); // начальное время
+	sobel(1);
 	unsigned int end_time = clock(); // конечное время
-	cout << (end_time - start_time) /1000.0 << " seconds." << endl;
+	save();	
+	cout << "Without optimization: " <<(end_time - start_time) /1000.0 << " seconds." << endl;
+
+	open();
+	unsigned int start_time1 = clock(); // начальное время
+	sobel(2);
+	unsigned int end_time1 = clock(); // конечное время
+	save();
+	cout << "With SSE: " << (end_time1 - start_time1) / 1000.0 << " seconds." << endl;
+
+	open();
+	unsigned int start_time2 = clock(); // начальное время
+	sobel(2);
+	unsigned int end_time2 = clock(); // конечное время
+	save();
+	cout << "With AVX: " << (end_time2 - start_time2) / 1000.0 << " seconds." << endl;
+
 	system("pause");
 	//show();
 }
@@ -71,7 +87,9 @@ void show() {
 
 	destroyWindow("MyWindow"); //destroy the window with the name, "MyWindow"
 }
-void sobel() {
+void sobel(int type) {
+	int edge;
+	float gy[6], gx[6];
 	int **a = new int *[20000];
 	for (int i = 0; i != 20000; ++i){
 		a[i] = new int[20000];
@@ -100,20 +118,26 @@ void sobel() {
 			pixelMatrix[2][1] = a[i + 1][j];
 			pixelMatrix[2][2] = a[i + 1][j + 1];
 			
-			/*float gy[6] = { (float)pixelMatrix[0][0],(float)pixelMatrix[0][1],(float)pixelMatrix[0][2],(float)pixelMatrix[2][0],
-				(float)pixelMatrix[2][1],(float)pixelMatrix[2][2] };
-			float gx[6] = { (float)pixelMatrix[0][0],(float)pixelMatrix[0][2],(float)pixelMatrix[1][0], (float)pixelMatrix[1][2],
-				(float)pixelMatrix[2][0],(float)pixelMatrix[2][2] };
-			int edge = (int)add_sse(gy,gx);*/
-
-			double gy[6] = { (double)pixelMatrix[0][0],(double)pixelMatrix[0][1],(double)pixelMatrix[0][2],(double)pixelMatrix[2][0],
-				(double)pixelMatrix[2][1],(double)pixelMatrix[2][2] };
-			double gx[6] = { (double)pixelMatrix[0][0],(double)pixelMatrix[0][2],(double)pixelMatrix[1][0], (double)pixelMatrix[1][2],
-				(double)pixelMatrix[2][0],(double)pixelMatrix[2][2] };
-			int edge = (int)add_avx(gy, gx);
-
+			switch (type) {
+			case 1: {
+				edge = (int)convolution();
+			}break;
+			case 2: {
+				float gy[6] = { (float)pixelMatrix[0][0],(float)pixelMatrix[0][1],(float)pixelMatrix[0][2],(float)pixelMatrix[2][0],
+					(float)pixelMatrix[2][1],(float)pixelMatrix[2][2] };
+				float gx[6] = { (float)pixelMatrix[0][0],(float)pixelMatrix[0][2],(float)pixelMatrix[1][0], (float)pixelMatrix[1][2],
+					(float)pixelMatrix[2][0],(float)pixelMatrix[2][2] };
+				edge = (int)add_sse(gy, gx);
+			}break;
+			case 3: {
+				double gy_1[6] = { (double)pixelMatrix[0][0],(double)pixelMatrix[0][1],(double)pixelMatrix[0][2],(double)pixelMatrix[2][0],
+					(double)pixelMatrix[2][1],(double)pixelMatrix[2][2] };
+				double gx_1[6] = { (double)pixelMatrix[0][0],(double)pixelMatrix[0][2],(double)pixelMatrix[1][0], (double)pixelMatrix[1][2],
+					(double)pixelMatrix[2][0],(double)pixelMatrix[2][2] };
+				edge = (int)add_avx(gy_1, gx_1);
+			}break;
+			}
 			Vec3b color = image.at<Vec3b>(Point(i, j));
-			//int edge = (int)convolution();
 			color.val[0] = edge;
 			color.val[1] = edge;
 			color.val[2] = edge;
@@ -126,16 +150,8 @@ void sobel() {
 double convolution() {
 
 	int gy = (pixelMatrix[0][0]=pixelMatrix[0][0] * -1) + (pixelMatrix[0][1]= pixelMatrix[0][1] * -2) + (pixelMatrix[0][2]=pixelMatrix[0][2] * -1) + (pixelMatrix[2][0]) + (pixelMatrix[2][1]=pixelMatrix[2][1] * 2) + (pixelMatrix[2][2]=pixelMatrix[2][2] * 1);
-	//cout << gy << "\n";
 	int gx = (pixelMatrix[0][0]) + (pixelMatrix[0][2] =pixelMatrix[0][2] * -1) + (pixelMatrix[1][0]=pixelMatrix[1][0] * 2) + (pixelMatrix[1][2]=pixelMatrix[1][2] * -2) + (pixelMatrix[2][0]) + (pixelMatrix[2][2]=pixelMatrix[2][2] * -1);
-	//cout << gx << "\n";
-	//cout << "\n";
-	/*for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			cout << pixelMatrix[i][j] << " ";
-		}
-		cout << "\n";
-	}*/
+
 	return sqrt(pow(gy, 2) + pow(gx, 2));
 }
 double add_sse(float *m_gy, float *m_gx){ //SSE
@@ -217,8 +233,4 @@ double add_avx(double *m_gy, double *m_gx) { //AVX
 
 	}
 	return sqrt(pow(sum_gy, 2) + pow(sum_gx, 2));
-}
-double add_sse4(int *m_gy, int *m_gx) { //SSE 4.1
-
-	return 1488;
 }
